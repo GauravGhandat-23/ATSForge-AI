@@ -1,28 +1,51 @@
-# secrets & personal data
-.env
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
 
-# runtime output
-*.log
+# Next.js Build Outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment & Secrets (NEVER COMMIT)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+
+# Local Data & Private Documents
+atsforge-data.json
+*.pdf
+*.docx
 applications*.csv
 apply-state-*.json
-*.png
 
-# saved browser sessions (contain logged-in cookies)
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Vercel & Coverage
+.vercel/
+coverage/
+
+# Test Artifacts & Old Automation profiles
+playwright-report/
+test-results/
 .*-chrome-profile/
 .*-apply-profile/
-
-# resume / personal docs
-*.pdf
-
-# machine-specific launchers (contain absolute local paths)
+.show-windows
 *.vbs
-.gitignore
-# local tooling / scratch
 .claude/
 naukri_update/
-
-# deps
-node_modules/
-
-# runtime flag: pauses automatic window hiding (created by show-windows.js)
-.show-windows

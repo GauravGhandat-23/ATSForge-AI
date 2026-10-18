@@ -1,18 +1,48 @@
 {
-  "name": "auto-apply",
+  "name": "atsforge-ai",
   "version": "1.0.0",
-  "main": "naukri-profile-refresh.js",
+  "private": true,
   "scripts": {
-    "refresh": "node naukri-profile-refresh.js",
-    "login": "node naukri-profile-refresh.js login"
+    "dev": "node -r ./patch-readlink.js ./node_modules/next/dist/bin/next dev",
+    "build": "node -r ./patch-readlink.js ./node_modules/next/dist/bin/next build",
+    "start": "node -r ./patch-readlink.js ./node_modules/next/dist/bin/next start",
+    "lint": "tsc --noEmit",
+    "test": "node test-live-auth.js"
   },
-  "keywords": ["naukri", "playwright", "automation"],
+  "keywords": [
+    "ats",
+    "resume-builder",
+    "ai-resume",
+    "ats-scanner",
+    "job-tracker"
+  ],
   "author": "Ankit Baghel",
   "license": "ISC",
-  "description": "Keeps your Naukri profile recently-updated by toggling the resume headline on a schedule",
+  "description": "ATSForge AI - Build. Optimize. Apply. Get Hired. AI Resume Builder, Deterministic ATS Scanner, and Career Preparation Suite",
   "dependencies": {
-    "playwright-core": "^1.61.1",
-    "playwright-extra": "^4.3.6",
-    "puppeteer-extra-plugin-stealth": "^2.11.2"
+    "@neondatabase/serverless": "^1.2.0",
+    "@types/canvas-confetti": "^1.9.0",
+    "@vercel/blob": "^2.8.2",
+    "@vercel/postgres": "^0.10.0",
+    "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.11.17",
+    "jose": "^6.2.12",
+    "lucide-react": "^0.460.0",
+    "mammoth": "^1.13.0",
+    "next": "^14.2.20",
+    "pdf-parse": "^2.4.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5"
   }
 }
