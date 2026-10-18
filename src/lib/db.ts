@@ -46,12 +46,14 @@ export class DatabaseManager {
   private initPostgresClient(): NeonQueryFunction<false, false> | null {
     if (this.sqlClient) return this.sqlClient;
 
-    const dbUrl =
+    const rawDbUrl =
       process.env.DATABASE_URL ||
       process.env.POSTGRES_URL ||
       process.env.POSTGRES_PRISMA_URL ||
       process.env.POSTGRES_URL_NON_POOLING ||
       process.env.NEON_DATABASE_URL;
+
+    const dbUrl = rawDbUrl?.trim().replace(/^["']|["']$/g, "");
 
     if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
       try {

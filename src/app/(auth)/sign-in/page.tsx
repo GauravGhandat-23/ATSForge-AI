@@ -27,11 +27,20 @@ function SignInContent() {
     if (errorParam) {
       setAuthState("error");
       switch (errorParam) {
-        case "missing_credentials":
-          setErrorMessage(
-            "Google OAuth credentials missing: Please configure GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in your .env.local file to enable live Google Sign-In."
-          );
+        case "missing_credentials": {
+          const missing = searchParams.get("missing") || "GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET";
+          const isVercel = typeof window !== "undefined" && window.location.hostname !== "localhost";
+          if (isVercel) {
+            setErrorMessage(
+              `Google OAuth credentials missing (${missing}). Please configure these variables in Vercel Project Settings (Settings -> Environment Variables) and trigger a redeployment.`
+            );
+          } else {
+            setErrorMessage(
+              `Google OAuth credentials missing (${missing}). Please configure your environment variables to enable live Google Sign-In.`
+            );
+          }
           break;
+        }
         case "google_cancelled":
           setErrorMessage("Google sign-in was cancelled.");
           break;
@@ -43,6 +52,9 @@ function SignInContent() {
           break;
         case "unverified_email":
           setErrorMessage("Please sign in with a verified Google email address.");
+          break;
+        case "auth_failed":
+          setErrorMessage("Authentication failed. Please verify your credentials and try again.");
           break;
         default:
           setErrorMessage("Unable to complete Google sign-in. Please try again.");

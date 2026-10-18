@@ -24,11 +24,11 @@ class UnconfiguredAIProvider implements AIProvider {
   name = "Unconfigured AI Provider";
 
   async generateText(): Promise<string> {
-    throw new Error("AI provider is not configured. Please set AI_PROVIDER and AI_API_KEY (or GEMINI_KEY) in .env.");
+    throw new Error("AI provider is not configured. Please set AI_PROVIDER and AI_API_KEY (or GEMINI_KEY) in your environment variables.");
   }
 
   async generateJSON<T>(): Promise<T> {
-    throw new Error("AI provider is not configured. Please set AI_PROVIDER and AI_API_KEY (or GEMINI_KEY) in .env.");
+    throw new Error("AI provider is not configured. Please set AI_PROVIDER and AI_API_KEY (or GEMINI_KEY) in your environment variables.");
   }
 }
 
@@ -50,7 +50,7 @@ class GenericHTTPProvider implements AIProvider {
 
   async generateText(prompt: string, systemPrompt?: string): Promise<string> {
     if (!this.apiKey || this.apiKey.trim() === "") {
-      throw new Error("AI provider is not configured. Please set AI_API_KEY (or GEMINI_KEY) in .env.");
+      throw new Error("AI provider is not configured. Please set AI_API_KEY (or GEMINI_KEY) in your environment variables.");
     }
 
     if (this.providerType === "openai" || this.providerType === "groq") {

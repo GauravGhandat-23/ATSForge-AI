@@ -108,10 +108,9 @@ export async function handleGoogleOAuthCallback(request: NextRequest) {
 
     return response;
   } catch (err: any) {
-    console.error("[Google OAuth] Callback processing failed:", err);
-    const safeError = encodeURIComponent(err.message || "Failed to authenticate with Google");
+    console.error("[Google OAuth] Callback processing failed:", err?.message || "Unknown error");
     return NextResponse.redirect(
-      new URL(`/sign-in?error=auth_failed&detail=${safeError}`, origin)
+      new URL("/sign-in?error=auth_failed", origin)
     );
   }
 }

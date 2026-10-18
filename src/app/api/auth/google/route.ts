@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   getGoogleAuthConfig,
+  validateGoogleAuthConfig,
   generateRandomString,
   generateCodeChallenge,
   buildGoogleAuthUrl,
@@ -18,11 +19,13 @@ export async function GET(request: NextRequest) {
   const origin = `${proto}://${host}`;
 
   const config = getGoogleAuthConfig(origin);
+  const validation = validateGoogleAuthConfig(config);
 
-  if (!config.clientId || !config.clientSecret) {
-    console.error("[Google OAuth] Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET.");
+  if (!validation.valid) {
+    console.warn(`[Google OAuth] Missing required environment credentials: ${validation.missing.join(", ")}`);
+    const missingParam = encodeURIComponent(validation.missing.join(", "));
     return NextResponse.redirect(
-      new URL("/sign-in?error=missing_credentials", origin)
+      new URL(`/sign-in?error=missing_credentials&missing=${missingParam}`, origin)
     );
   }
 

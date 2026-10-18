@@ -20,22 +20,53 @@ export interface GoogleUserInfo {
   email_verified: boolean;
 }
 
-export function getGoogleAuthConfig(reqOrigin?: string): GoogleAuthConfig {
-  const clientId = process.env.GOOGLE_CLIENT_ID || "";
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
+function cleanEnv(val?: string): string {
+  if (!val) return "";
+  return val.trim().replace(/^["']|["']$/g, "").trim();
+}
 
-  // 1. Direct callback override (e.g., https://ats-forge-ai.vercel.app/auth/callback)
-  let callbackUrl = process.env.AUTH_CALLBACK_URL || "";
+export interface GoogleAuthValidation {
+  valid: boolean;
+  missing: string[];
+}
+
+export function validateGoogleAuthConfig(config: GoogleAuthConfig): GoogleAuthValidation {
+  const missing: string[] = [];
+  if (!config.clientId) missing.push("GOOGLE_CLIENT_ID");
+  if (!config.clientSecret) missing.push("GOOGLE_CLIENT_SECRET");
+  return {
+    valid: missing.length === 0,
+    missing,
+  };
+}
+
+export function getGoogleAuthConfig(reqOrigin?: string): GoogleAuthConfig {
+  // Read standard server-side environment variables with trimming to handle accidental spaces or wrapping quotes
+  const clientId = cleanEnv(
+    process.env.GOOGLE_CLIENT_ID ||
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ||
+    process.env.AUTH_GOOGLE_ID ||
+    process.env.GOOGLE_ID
+  );
+
+  const clientSecret = cleanEnv(
+    process.env.GOOGLE_CLIENT_SECRET ||
+    process.env.AUTH_GOOGLE_SECRET ||
+    process.env.GOOGLE_SECRET
+  );
+
+  // 1. Direct explicit callback override (e.g. https://ats-forge-ai.vercel.app/auth/callback)
+  let callbackUrl = cleanEnv(process.env.AUTH_CALLBACK_URL);
 
   // 2. Base application URL
-  let appUrl =
+  let appUrl = cleanEnv(
     process.env.AUTH_URL ||
     process.env.APP_URL ||
-    process.env.NEXT_PUBLIC_APP_URL ||
-    "";
+    process.env.NEXT_PUBLIC_APP_URL
+  );
 
   if (!appUrl && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
-    appUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    appUrl = `https://${cleanEnv(process.env.VERCEL_PROJECT_PRODUCTION_URL)}`;
   }
 
   if (!appUrl && reqOrigin && !reqOrigin.includes("localhost")) {
@@ -186,7 +217,7 @@ export async function exchangeGoogleCode({
 
   if (!res.ok || data.error) {
     const errorMsg = data.error_description || data.error || "Token exchange failed";
-    console.error("Google token exchange error:", data);
+    console.error("[Google OAuth] Token exchange error:", errorMsg);
     throw new Error(errorMsg);
   }
 

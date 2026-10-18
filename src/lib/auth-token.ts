@@ -13,10 +13,10 @@ export interface SessionPayload {
 export const SESSION_COOKIE_NAME = "atsforge_session";
 
 export function getAuthSecret(): string {
-  const secret = process.env.AUTH_SECRET;
+  const secret = process.env.AUTH_SECRET?.trim().replace(/^["']|["']$/g, "");
   if (!secret) {
     if (process.env.NODE_ENV === "production") {
-      console.warn("WARNING: AUTH_SECRET is not set in production. Using fallback secret.");
+      console.warn("[Session Security] AUTH_SECRET is not set. Using fallback session signing key.");
     }
     return "atsforge-super-secure-production-ready-oauth-jwt-secret-key-32chars";
   }

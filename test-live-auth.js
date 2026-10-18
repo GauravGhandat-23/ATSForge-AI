@@ -5,12 +5,7 @@ const { SignJWT } = require("jose");
 
 const BASE_URL = "http://localhost:3000";
 
-let AUTH_SECRET = "atsforge-production-oauth-jwt-secret-key-32chars";
-try {
-  const envContent = fs.readFileSync(path.join(__dirname, ".env.local"), "utf8");
-  const match = envContent.match(/AUTH_SECRET=([^\r\n]+)/);
-  if (match) AUTH_SECRET = match[1].trim();
-} catch (e) {}
+let AUTH_SECRET = process.env.AUTH_SECRET || "atsforge-production-oauth-jwt-secret-key-32chars";
 
 async function testLiveAuth() {
   console.log("==================================================");

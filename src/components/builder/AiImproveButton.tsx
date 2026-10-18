@@ -61,7 +61,7 @@ export function AiImproveButton({
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        alert(errData.error || "AI provider is not configured. Please set AI_PROVIDER and AI_API_KEY in .env.");
+        alert(errData.error || "AI provider is not configured. Please set AI_PROVIDER and AI_API_KEY environment variables.");
       }
     } catch (e: any) {
       console.error(e);
