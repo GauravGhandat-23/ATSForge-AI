@@ -34,6 +34,17 @@ export default function SettingsPage() {
   const [defaultTemplate, setDefaultTemplate] = useState("ats-classic");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  React.useEffect(() => {
+    if (user?.settings) {
+      if (user.settings.paperSize) setPaperSize(user.settings.paperSize);
+      if (user.settings.defaultTemplate) setDefaultTemplate(user.settings.defaultTemplate);
+      if (typeof user.settings.notificationsEnabled === "boolean") {
+        setNotificationsEnabled(user.settings.notificationsEnabled);
+      }
+    }
+  }, [user]);
 
   const handleDeleteAccount = async () => {
     if (deleteConfirmation !== "DELETE") {
@@ -64,10 +75,30 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSavePreferences = (e: React.FormEvent) => {
+  const handleSavePreferences = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
+    setIsSaving(true);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          settings: {
+            paperSize,
+            defaultTemplate,
+            notificationsEnabled,
+          },
+        }),
+      });
+      if (res.ok) {
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 2500);
+      }
+    } catch {
+      // Safe fallback
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

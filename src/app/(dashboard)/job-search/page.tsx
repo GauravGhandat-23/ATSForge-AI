@@ -114,18 +114,36 @@ export default function JobSearchPage() {
     return matchesKeyword && matchesLocation;
   });
 
-  const handleSaveJob = (job: JobPosting) => {
-    setSavedJobIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(job.id)) {
+  const handleSaveJob = async (job: JobPosting) => {
+    const isCurrentlySaved = savedJobIds.has(job.id);
+    if (isCurrentlySaved) {
+      setSavedJobIds((prev) => {
+        const next = new Set(prev);
         next.delete(job.id);
-        setActionNotice(`Removed ${job.title} from Saved Jobs`);
-      } else {
-        next.add(job.id);
-        setActionNotice(`Saved ${job.title} to Saved Jobs`);
+        return next;
+      });
+      setActionNotice(`Removed ${job.title} from Saved Jobs`);
+    } else {
+      setSavedJobIds((prev) => new Set(prev).add(job.id));
+      try {
+        await fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            company: job.company,
+            jobTitle: job.title,
+            jobUrl: job.url,
+            location: job.location,
+            status: "Wishlist",
+            salary: job.salary,
+            notes: `Saved via ATSForge Job Search. Skills: ${job.skills.join(", ")}`,
+          }),
+        });
+      } catch {
+        // Fallback
       }
-      return next;
-    });
+      setActionNotice(`Saved ${job.title} to Saved Jobs`);
+    }
     setTimeout(() => setActionNotice(null), 3000);
   };
 

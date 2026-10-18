@@ -129,6 +129,7 @@ export interface UserRecord {
   last_name: string;
   avatar_url: string;
   email_verified: boolean;
+  settings?: Record<string, any>;
   created_at: string;
   updated_at: string;
   last_login_at: string;

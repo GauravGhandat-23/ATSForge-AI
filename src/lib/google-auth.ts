@@ -23,20 +23,39 @@ export interface GoogleUserInfo {
 export function getGoogleAuthConfig(reqOrigin?: string): GoogleAuthConfig {
   const clientId = process.env.GOOGLE_CLIENT_ID || "";
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET || "";
-  
-  // Prioritize APP_URL, then AUTH_URL, then VERCEL_URL, then request origin, fallback to localhost:3000
-  let appUrl = process.env.APP_URL || process.env.AUTH_URL || "";
-  if (!appUrl && process.env.VERCEL_URL) {
-    appUrl = `https://${process.env.VERCEL_URL}`;
-  }
-  if (!appUrl) {
-    appUrl = reqOrigin || "http://localhost:3000";
+
+  // 1. Direct callback override (e.g., https://ats-forge-ai.vercel.app/auth/callback)
+  let callbackUrl = process.env.AUTH_CALLBACK_URL || "";
+
+  // 2. Base application URL
+  let appUrl =
+    process.env.AUTH_URL ||
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    "";
+
+  if (!appUrl && process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    appUrl = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
 
-  // Use configured AUTH_CALLBACK_URL or standard /auth/callback
-  let callbackUrl = process.env.AUTH_CALLBACK_URL || "";
+  if (!appUrl && reqOrigin && !reqOrigin.includes("localhost")) {
+    appUrl = reqOrigin;
+  }
+
+  if (!appUrl) {
+    if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+      appUrl = "https://ats-forge-ai.vercel.app";
+    } else {
+      appUrl = reqOrigin || "http://localhost:3000";
+    }
+  }
+
+  // Strip trailing slashes
+  appUrl = appUrl.replace(/\/$/, "");
+
+  // 3. Resolve callback URL if not explicitly set
   if (!callbackUrl) {
-    callbackUrl = `${appUrl.replace(/\/$/, "")}/auth/callback`;
+    callbackUrl = `${appUrl}/auth/callback`;
   }
 
   return {

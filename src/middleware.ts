@@ -18,6 +18,8 @@ const PROTECTED_PREFIXES = [
   "/linkedin-generator",
   "/templates",
   "/applications",
+  "/saved-jobs",
+  "/profile",
   "/settings",
 ];
 

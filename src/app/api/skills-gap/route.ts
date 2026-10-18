@@ -1,13 +1,18 @@
 import { NextResponse } from "next/server";
 import { SkillsGapService } from "@/lib/ai-service";
 import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+
+export const dynamic = "force-dynamic";
+
 export async function POST(request: Request) {
   try {
+    const user = await getCurrentUser();
     const { resumeId, resumeData, jobDescription = "" } = await request.json();
 
     const targetResume =
       resumeData ||
-      (resumeId ? await db.getResumeById(resumeId) : null);
+      (resumeId ? await db.getResumeById(resumeId, user?.id) : null);
 
     if (!targetResume) {
       return NextResponse.json({ error: "Resume is required. Please select or create a resume first." }, { status: 400 });

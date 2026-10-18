@@ -9,7 +9,9 @@ import { createSessionToken, SESSION_COOKIE_NAME } from "./session";
 
 export async function handleGoogleOAuthCallback(request: NextRequest) {
   const url = new URL(request.url);
-  const origin = url.origin;
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || url.host;
+  const proto = request.headers.get("x-forwarded-proto") || (url.protocol.replace(":", "") || "https");
+  const origin = `${proto}://${host}`;
 
   const error = url.searchParams.get("error");
   const code = url.searchParams.get("code");
@@ -46,6 +48,8 @@ export async function handleGoogleOAuthCallback(request: NextRequest) {
 
   try {
     const config = getGoogleAuthConfig(origin);
+    const redirectUri =
+      request.cookies.get("atsforge_oauth_redirect_uri")?.value || config.callbackUrl;
 
     // 4. Exchange authorization code securely with Google
     const tokens = await exchangeGoogleCode({
@@ -53,7 +57,7 @@ export async function handleGoogleOAuthCallback(request: NextRequest) {
       codeVerifier,
       clientId: config.clientId,
       clientSecret: config.clientSecret,
-      redirectUri: config.callbackUrl,
+      redirectUri,
     });
 
     // 5. Retrieve verified Google profile identity
@@ -99,6 +103,7 @@ export async function handleGoogleOAuthCallback(request: NextRequest) {
     // 10. Clear temporary OAuth cookies
     response.cookies.delete("atsforge_oauth_state");
     response.cookies.delete("atsforge_oauth_verifier");
+    response.cookies.delete("atsforge_oauth_redirect_uri");
     response.cookies.delete("atsforge_auth_redirect");
 
     return response;

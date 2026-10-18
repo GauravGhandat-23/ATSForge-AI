@@ -39,25 +39,46 @@ export class DatabaseManager {
   private localData: StorageSchema;
 
   constructor() {
-    const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+    this.initPostgresClient();
+    this.localData = this.getLocalData();
+  }
+
+  private initPostgresClient(): NeonQueryFunction<false, false> | null {
+    if (this.sqlClient) return this.sqlClient;
+
+    const dbUrl =
+      process.env.DATABASE_URL ||
+      process.env.POSTGRES_URL ||
+      process.env.POSTGRES_PRISMA_URL ||
+      process.env.POSTGRES_URL_NON_POOLING ||
+      process.env.NEON_DATABASE_URL;
+
     if (dbUrl && (dbUrl.startsWith("postgres://") || dbUrl.startsWith("postgresql://"))) {
       try {
         this.sqlClient = neon(dbUrl);
         this.isPostgres = true;
+        return this.sqlClient;
       } catch (err) {
-        console.warn("[DatabaseManager] Could not initialize Vercel Postgres connection. Falling back to local store.", err);
+        console.warn(
+          "[DatabaseManager] Could not initialize Neon Postgres connection. Falling back to local store.",
+          err
+        );
       }
+    } else if (process.env.NODE_ENV === "production" || process.env.VERCEL) {
+      console.warn(
+        "[DatabaseManager] WARNING: No PostgreSQL connection URL found in production. Ensure Neon Postgres is connected in Vercel project settings."
+      );
     }
-    this.localData = this.getLocalData();
+    return null;
   }
 
   private async ensureTables(): Promise<void> {
-    if (!this.isPostgres || !this.sqlClient) return;
+    const sql = this.initPostgresClient();
+    if (!this.isPostgres || !sql) return;
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
       try {
-        const sql = this.sqlClient!;
         await sql`
           CREATE TABLE IF NOT EXISTS users (
             id VARCHAR(64) PRIMARY KEY,
@@ -68,11 +89,20 @@ export class DatabaseManager {
             last_name VARCHAR(128),
             avatar_url TEXT,
             email_verified BOOLEAN DEFAULT TRUE,
+            settings JSONB DEFAULT '{}'::jsonb,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW(),
             last_login_at TIMESTAMPTZ DEFAULT NOW()
           );
         `;
+
+        // Migrate settings column if table existed previously without it
+        try {
+          await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS settings JSONB DEFAULT '{}'::jsonb;`;
+        } catch {
+          // Ignored if column already exists
+        }
+
         await sql`
           CREATE TABLE IF NOT EXISTS resumes (
             id VARCHAR(64) PRIMARY KEY,
@@ -87,6 +117,7 @@ export class DatabaseManager {
             last_edited TIMESTAMPTZ DEFAULT NOW()
           );
         `;
+
         await sql`
           CREATE TABLE IF NOT EXISTS resume_versions (
             id VARCHAR(64) PRIMARY KEY,
@@ -100,6 +131,7 @@ export class DatabaseManager {
             created_at TIMESTAMPTZ DEFAULT NOW()
           );
         `;
+
         await sql`
           CREATE TABLE IF NOT EXISTS ats_scans (
             id VARCHAR(64) PRIMARY KEY,
@@ -111,6 +143,7 @@ export class DatabaseManager {
             created_at TIMESTAMPTZ DEFAULT NOW()
           );
         `;
+
         await sql`
           CREATE TABLE IF NOT EXISTS cover_letters (
             id VARCHAR(64) PRIMARY KEY,
@@ -123,6 +156,7 @@ export class DatabaseManager {
             created_at TIMESTAMPTZ DEFAULT NOW()
           );
         `;
+
         await sql`
           CREATE TABLE IF NOT EXISTS applications (
             id VARCHAR(64) PRIMARY KEY,
@@ -142,6 +176,56 @@ export class DatabaseManager {
             updated_at TIMESTAMPTZ DEFAULT NOW()
           );
         `;
+
+        await sql`
+          CREATE TABLE IF NOT EXISTS saved_jobs (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            job_id VARCHAR(64) NOT NULL,
+            title VARCHAR(255) NOT NULL,
+            company VARCHAR(255) NOT NULL,
+            location VARCHAR(255),
+            salary VARCHAR(128),
+            url TEXT,
+            description TEXT,
+            skills JSONB DEFAULT '[]'::jsonb,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+          );
+        `;
+
+        await sql`
+          CREATE TABLE IF NOT EXISTS interview_prep (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            resume_id VARCHAR(64),
+            job_description TEXT,
+            questions JSONB NOT NULL,
+            practice_sessions JSONB DEFAULT '[]'::jsonb,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+          );
+        `;
+
+        await sql`
+          CREATE TABLE IF NOT EXISTS skills_gap (
+            id VARCHAR(64) PRIMARY KEY,
+            user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            resume_id VARCHAR(64),
+            job_description TEXT,
+            gap_items JSONB NOT NULL,
+            created_at TIMESTAMPTZ DEFAULT NOW()
+          );
+        `;
+
+        // Ensure performance indexes exist
+        await sql`CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_resumes_user_id ON resumes(user_id);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_resume_versions_user_id ON resume_versions(user_id);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_ats_scans_user_id ON ats_scans(user_id);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_cover_letters_user_id ON cover_letters(user_id);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);`;
+        await sql`CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id ON saved_jobs(user_id);`;
       } catch (e) {
         console.warn("[DatabaseManager] Table auto-provisioning note:", e);
       }
@@ -250,6 +334,7 @@ export class DatabaseManager {
           last_name: u.last_name || "",
           avatar_url: u.avatar_url || "",
           email_verified: Boolean(u.email_verified),
+          settings: u.settings || {},
           created_at: u.created_at,
           updated_at: u.updated_at,
           last_login_at: u.last_login_at,
@@ -260,7 +345,7 @@ export class DatabaseManager {
       const newId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
       const inserted = await sql`
         INSERT INTO users (
-          id, google_id, email, name, first_name, last_name, avatar_url, email_verified, created_at, updated_at, last_login_at
+          id, google_id, email, name, first_name, last_name, avatar_url, email_verified, settings, created_at, updated_at, last_login_at
         ) VALUES (
           ${newId},
           ${profile.google_id},
@@ -270,6 +355,7 @@ export class DatabaseManager {
           ${profile.last_name || profile.name.split(" ").slice(1).join(" ") || ""},
           ${profile.avatar_url || ""},
           ${profile.email_verified ?? true},
+          ${JSON.stringify({})},
           NOW(),
           NOW(),
           NOW()
@@ -286,6 +372,7 @@ export class DatabaseManager {
         last_name: u.last_name || "",
         avatar_url: u.avatar_url || "",
         email_verified: Boolean(u.email_verified),
+        settings: u.settings || {},
         created_at: u.created_at,
         updated_at: u.updated_at,
         last_login_at: u.last_login_at,
@@ -320,6 +407,7 @@ export class DatabaseManager {
       last_name: profile.last_name || profile.name.split(" ").slice(1).join(" ") || "",
       avatar_url: profile.avatar_url || "",
       email_verified: profile.email_verified ?? true,
+      settings: {},
       created_at: now,
       updated_at: now,
       last_login_at: now,
@@ -345,6 +433,7 @@ export class DatabaseManager {
         last_name: u.last_name || "",
         avatar_url: u.avatar_url || "",
         email_verified: Boolean(u.email_verified),
+        settings: u.settings || {},
         created_at: u.created_at,
         updated_at: u.updated_at,
         last_login_at: u.last_login_at,
@@ -369,6 +458,7 @@ export class DatabaseManager {
         last_name: u.last_name || "",
         avatar_url: u.avatar_url || "",
         email_verified: Boolean(u.email_verified),
+        settings: u.settings || {},
         created_at: u.created_at,
         updated_at: u.updated_at,
         last_login_at: u.last_login_at,
@@ -390,6 +480,7 @@ export class DatabaseManager {
             first_name = ${merged.first_name},
             last_name = ${merged.last_name},
             avatar_url = ${merged.avatar_url},
+            settings = ${JSON.stringify(merged.settings || {})},
             updated_at = NOW()
         WHERE id = ${id}
         RETURNING *;
@@ -405,6 +496,7 @@ export class DatabaseManager {
         last_name: u.last_name || "",
         avatar_url: u.avatar_url || "",
         email_verified: Boolean(u.email_verified),
+        settings: u.settings || {},
         created_at: u.created_at,
         updated_at: u.updated_at,
         last_login_at: u.last_login_at,
@@ -1035,6 +1127,218 @@ export class DatabaseManager {
       return true;
     }
     return false;
+  }
+
+  // ==========================================
+  // --- SAVED JOBS (USER-ISOLATED) ---
+  // ==========================================
+  async getSavedJobs(userId: string) {
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      const rows = await this.sqlClient`
+        SELECT * FROM saved_jobs WHERE user_id = ${userId} ORDER BY created_at DESC;
+      `;
+      return rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        jobId: r.job_id,
+        title: r.title,
+        company: r.company,
+        location: r.location || "",
+        salary: r.salary || "",
+        url: r.url || "",
+        description: r.description || "",
+        skills: r.skills || [],
+        createdAt: r.created_at,
+      }));
+    }
+    return this.getApplications(userId).then((apps) =>
+      apps
+        .filter((a) => a.status === "Wishlist")
+        .map((a) => ({
+          id: a.id,
+          userId: a.userId,
+          jobId: a.id,
+          title: a.jobTitle,
+          company: a.company,
+          location: a.location,
+          salary: a.salary,
+          url: a.jobUrl,
+          description: a.notes,
+          skills: [],
+          createdAt: a.createdAt,
+        }))
+    );
+  }
+
+  async saveSavedJob(
+    job: {
+      jobId: string;
+      title: string;
+      company: string;
+      location?: string;
+      salary?: string;
+      url?: string;
+      description?: string;
+      skills?: string[];
+    },
+    userId: string
+  ) {
+    const id = `sjob-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      await this.sqlClient`
+        INSERT INTO saved_jobs (
+          id, user_id, job_id, title, company, location, salary, url, description, skills, created_at
+        ) VALUES (
+          ${id},
+          ${userId},
+          ${job.jobId},
+          ${job.title},
+          ${job.company},
+          ${job.location || ""},
+          ${job.salary || ""},
+          ${job.url || ""},
+          ${job.description || ""},
+          ${JSON.stringify(job.skills || [])},
+          NOW()
+        );
+      `;
+      return { id, userId, ...job, createdAt: now };
+    }
+
+    return await this.saveApplication(
+      {
+        company: job.company,
+        jobTitle: job.title,
+        jobUrl: job.url,
+        location: job.location,
+        salary: job.salary,
+        notes: job.description,
+        status: "Wishlist",
+      },
+      userId
+    );
+  }
+
+  async deleteSavedJob(id: string, userId: string): Promise<boolean> {
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      const res = await this.sqlClient`
+        DELETE FROM saved_jobs WHERE (id = ${id} OR job_id = ${id}) AND user_id = ${userId} RETURNING id;
+      `;
+      return res.length > 0;
+    }
+    return this.deleteApplication(id, userId);
+  }
+
+  // ==========================================
+  // --- INTERVIEW PREP (USER-ISOLATED) ---
+  // ==========================================
+  async saveInterviewPrep(
+    prep: {
+      resumeId?: string;
+      jobDescription?: string;
+      questions: any[];
+      practiceSessions?: any[];
+    },
+    userId: string
+  ) {
+    const id = `ip-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      await this.sqlClient`
+        INSERT INTO interview_prep (
+          id, user_id, resume_id, job_description, questions, practice_sessions, created_at, updated_at
+        ) VALUES (
+          ${id},
+          ${userId},
+          ${prep.resumeId || null},
+          ${prep.jobDescription || ""},
+          ${JSON.stringify(prep.questions)},
+          ${JSON.stringify(prep.practiceSessions || [])},
+          NOW(),
+          NOW()
+        );
+      `;
+      return { id, userId, ...prep, createdAt: now, updatedAt: now };
+    }
+    return { id, userId, ...prep, createdAt: now, updatedAt: now };
+  }
+
+  async getInterviewPrep(userId: string) {
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      const rows = await this.sqlClient`
+        SELECT * FROM interview_prep WHERE user_id = ${userId} ORDER BY updated_at DESC;
+      `;
+      return rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        resumeId: r.resume_id,
+        jobDescription: r.job_description,
+        questions: r.questions,
+        practiceSessions: r.practice_sessions,
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      }));
+    }
+    return [];
+  }
+
+  // ==========================================
+  // --- SKILLS GAP (USER-ISOLATED) ---
+  // ==========================================
+  async saveSkillsGap(
+    gap: {
+      resumeId?: string;
+      jobDescription?: string;
+      gapItems: any[];
+    },
+    userId: string
+  ) {
+    const id = `sg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      await this.sqlClient`
+        INSERT INTO skills_gap (
+          id, user_id, resume_id, job_description, gap_items, created_at
+        ) VALUES (
+          ${id},
+          ${userId},
+          ${gap.resumeId || null},
+          ${gap.jobDescription || ""},
+          ${JSON.stringify(gap.gapItems)},
+          NOW()
+        );
+      `;
+      return { id, userId, ...gap, createdAt: now };
+    }
+    return { id, userId, ...gap, createdAt: now };
+  }
+
+  async getSkillsGap(userId: string) {
+    if (this.isPostgres && this.sqlClient) {
+      await this.ensureTables();
+      const rows = await this.sqlClient`
+        SELECT * FROM skills_gap WHERE user_id = ${userId} ORDER BY created_at DESC;
+      `;
+      return rows.map((r: any) => ({
+        id: r.id,
+        userId: r.user_id,
+        resumeId: r.resume_id,
+        jobDescription: r.job_description,
+        gapItems: r.gap_items,
+        createdAt: r.created_at,
+      }));
+    }
+    return [];
   }
 
   clearAllData(): void {

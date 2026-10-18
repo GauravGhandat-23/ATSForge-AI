@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
   last_name VARCHAR(128),
   avatar_url TEXT,
   email_verified BOOLEAN DEFAULT TRUE,
+  settings JSONB DEFAULT '{}'::jsonb,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW(),
   last_login_at TIMESTAMPTZ DEFAULT NOW()
@@ -99,3 +100,46 @@ CREATE TABLE IF NOT EXISTS applications (
 );
 
 CREATE INDEX IF NOT EXISTS idx_applications_user_id ON applications(user_id);
+
+-- 7. Saved Jobs Table
+CREATE TABLE IF NOT EXISTS saved_jobs (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  job_id VARCHAR(64) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  company VARCHAR(255) NOT NULL,
+  location VARCHAR(255),
+  salary VARCHAR(128),
+  url TEXT,
+  description TEXT,
+  skills JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_saved_jobs_user_id ON saved_jobs(user_id);
+
+-- 8. Interview Preparation Table
+CREATE TABLE IF NOT EXISTS interview_prep (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  resume_id VARCHAR(64),
+  job_description TEXT,
+  questions JSONB NOT NULL,
+  practice_sessions JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_interview_prep_user_id ON interview_prep(user_id);
+
+-- 9. Skills Gap Analysis Table
+CREATE TABLE IF NOT EXISTS skills_gap (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id VARCHAR(64) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  resume_id VARCHAR(64),
+  job_description TEXT,
+  gap_items JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_skills_gap_user_id ON skills_gap(user_id);
